@@ -29,7 +29,6 @@ your system to get the fastest execution time.
 
 
 ##Usage
--------
 
 Demonstration of how pindel can be used
  
@@ -52,6 +51,6 @@ If you want to have the indel calls in vcf format, you can use the pindel to vcf
  
 
 ##Contact
--------
+
 Please contact Beifang Niu by bniu@genome.wustl.edu and Kai Ye by kye@genome.wustl.edu if you have any questions.
 
