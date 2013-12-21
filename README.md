@@ -27,11 +27,31 @@ The `THREADS` option defines the number of threads used in the functional tests,
 this should be at least 2, it is recommended to match the number of cores in
 your system to get the fastest execution time.
 
-## Different tests
-The following test targets are defined:
 
-1. acceptance-tests
-2. coverage-tests
-3. functional-tests
-4. regression-tests
+##Usage
+-------
+
+Demonstration of how pindel can be used
+ 
+To see all options of pindel, run pindel without any arguments, such as: 
+<pindel_directory>/pindel
+ 
+To run Pindel on a BAM-file, use the following command: 
+    
+    <pindel_directory>/pindel -i <bam_config_file> -f <reference.fa> -o <output_prefix> -c <name_of_chromosome/ALL>
+
+Note that the bam-files must have been indexed in advance with samtools index 
+ 
+Finally, one can run pindel on txt files out of bam-files created with bam2pindel. This option is not strictly needed as versions of pindel since 0.2.0 can read BAM files directly, this comparison of an actual tumor sample to its normal control gives an indication of Pindel\'s capabilities in research and clinical settings.
+    
+    <pindel_directory/pindel -p <pindel_input_file> -f <reference.fa> -o <output_prefix> -c <name_of_chromosome/ALL>
+ 
+If you want to have the indel calls in vcf format, you can use the pindel to vcfconverter pindel2vcf;
+    
+    <pindel_directory>/pindel2vcf -r <reference.fa> -R <name_of_reference> -d <date_of_reference> -p <pindel_output_file>
+ 
+
+##Contact
+-------
+Please contact Beifang Niu by bniu@genome.wustl.edu and Kai Ye by kye@genome.wustl.edu if you have any questions.
 
