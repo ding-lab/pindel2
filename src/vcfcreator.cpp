@@ -1334,6 +1334,7 @@ void convertIndelToSVdata( InputReader& pindelInput, map< string, int>& sampleMa
 
 	string ntAdded = fetchElement( lineStream, 1 ); // to 6
 	string ntInvAdded = "";
+        string testaaaaaaaaaaaa = "";
 
 	// basically, there are two type of inversions:
 	//	a) The 'alternatively called small deletions' INV 2 NT 2 "TG"
