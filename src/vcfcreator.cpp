@@ -67,6 +67,7 @@ CHAPTER 2. Defining the parameters and the 'Parameter class' to handle them.
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <iterator>
 #include <map>
 #include <set>
@@ -86,7 +87,7 @@ using namespace std;
 
 // index of first sample name
 const int FIRST_SAMPLE_INDEX = 32; 
-bool g_normalBaseArray[256];
+bool g_normalBaseArray[256] = { false };
 string g_versionString = "0.5.8";
 string g_programName = "pindel2vcf";
 
@@ -105,13 +106,10 @@ struct ParameterSettings {
     string pindelroot;
     string vcffile;
     string chromosome;
-
     double HetCutoff;
     double HomCutoff;
-
     int windowSize;
     int MinCoverage;
-
     int minsize;
     int maxsize;
     int minsuppSamples;
@@ -125,7 +123,6 @@ struct ParameterSettings {
     int maxPostRepeatLength;
     int minimumStrandSupport;
     int compactOutput;
-
     bool onlyBalancedSamples;
     bool showHelp;
     bool gatkCompatible;
@@ -367,7 +364,7 @@ Parameter::Parameter( const string& shortName, const string& longName,
 }
 
 void Parameter::describe() const {
-    cout << d_shortName << "/" << d_longName << "  " << d_description;
+    cout << std::left << std::setw(3) << d_shortName << ", " << setw(30)<< d_longName << "  " << d_description;
     if ( d_required ) { cout << ": required parameter" ; }
     cout << endl;
 }
@@ -1155,208 +1152,6 @@ template<class T> void showVector( vector<T> vect ) {
 }
 
 /* 'convertIndelToSVdata' converts insertions and deletions to nicely formatted SV-data. */
-<<<<<<< HEAD
-void convertIndelToSVdata( InputReader& pindelInput, map< string, int>& sampleMap, Genome& genome, SVData& svd, const string& targetChromosomeID)
-{
-	string line;
-	svd.setGenome( genome );
-	do {
-		line = pindelInput.getLine();
-	}
-	while (!pindelInput.eof() && !isdigit(line[0]));
-
-	if (pindelInput.eof()) {
-		 return;
-	}
-
-	stringstream lineStream;
-	lineStream << line;
-	string svType = fetchElement( lineStream, 2 ); // to 2
-	if ( svType.compare("LI") == 0 ) {
-		svd.setSVtype("INS");
-		svd.setSVlen( 0 );
-		string chromosomeID = fetchElement( lineStream, 2);
-		const string* reference = genome.getChromosome( chromosomeID );
-		if ( reference== NULL ) {
-			cout << "Error! Reference chromosome \"" << chromosomeID << "\" not found!" << endl;
-			exit(EXIT_FAILURE);
-		}
-		svd.setChromosome( chromosomeID );
-		if (chromosomeID!=targetChromosomeID) {
-			return;
-		}
-		int beforeStartPos = atoi( fetchElement( lineStream, 1 ).c_str() );
-		svd.setPosition( beforeStartPos );
-		int totalPlusSupport = atoi( fetchElement( lineStream, 2 ).c_str());
-		int rightmostEndPos = atoi (fetchElement( lineStream, 1 ).c_str()); // now at position 14
-		//cout << "plusSupport, righmostEndPos is " << plusSupport << ", " << rightmostEndPos << endl;
-		svd.setEnd( rightmostEndPos );
-		svd.setBPrange( beforeStartPos, rightmostEndPos );
-		int totalMinSupport = atoi( fetchElement( lineStream, 2 ).c_str());
-		// if the file has been created by a recent version of pindel, read in the extra elements
-		string sampleName = fetchElement( lineStream, 1);
-		int refSupportAtStartOfEvent = 0;
-		int refSupportAtEndOfEvent = 0;
-
-		/*if ( pindel024uOrLater ) {
-		refSupportAtStartOfEvent = atoi( fetchElement( lineStream, 1 ).c_str());
-		refSupportAtEndOfEvent = atoi( fetchElement( lineStream, 1 ).c_str());
-		}*/
-		int totalRefSupport = max(refSupportAtStartOfEvent, refSupportAtEndOfEvent);
-		int numberItemsUntilNextSupport = ( pindel024uOrLater ? 2 : 2 );	
-		int samplePlusSupport = atoi( fetchElement( lineStream, numberItemsUntilNextSupport ).c_str());
-		int sampleMinSupport = atoi( fetchElement( lineStream, numberItemsUntilNextSupport ).c_str()); // now at position 35, total +supports sample 1
-		//int count=0;
-		while (!lineStream.fail()) {
-			if (sampleMap.find( sampleName )==sampleMap.end() ) {
-				cout << "Error: could not find sample " << sampleName << endl;
-			}
-			else {
-				int sampleID = sampleMap[ sampleName ];
-				svd.addGenotype( sampleID, samplePlusSupport , sampleMinSupport, totalRefSupport );
-			}
-				/*if ( pindel024uOrLater ) {
-					refSupportAtStartOfEvent = atoi( fetchElement( lineStream, 1 ).c_str() );
-					refSupportAtEndOfEvent = atoi( fetchElement( lineStream, 1 ).c_str());
-				}*/
-			int totalRefSupport = max(refSupportAtStartOfEvent, refSupportAtEndOfEvent);
-			sampleName = fetchElement( lineStream, 1); // for unique support, 2->1,
-			samplePlusSupport = atoi( fetchElement( lineStream, numberItemsUntilNextSupport ).c_str()); // for unique support, 2->1
-			sampleMinSupport = atoi( fetchElement( lineStream, numberItemsUntilNextSupport ).c_str()); // now at position 33, total +supports sample 1
-		}
-		return;
-	}
-	svd.setSVlen( fetchElement( lineStream, 1 ) ); // to 3
-
-	// get number(s) of NT bases added (two numbers for inversions!)
-	string numNTaddedStr = fetchElement( lineStream, 2 ); // to 5
-
-	int numNTadded = atoi( numNTaddedStr.c_str() ); // should get first number
-	bool simpleInversion = false;
-	int numNTinvAdded=-1;
-	//cout << "Printing " << numNTaddedStr << endl;
-	if ( svType.compare("INV") == 0 ) { // two numbers separated by : instead of one
-		//cout << "Found ':' at position " << numNTaddedStr.find(":") << endl;
-		if (numNTaddedStr.find(":")==string::npos) {
-			//cout << "Found simple inversion!\n";
-			simpleInversion = true;
-		}
-		else {
-			int separatorPos = numNTaddedStr.find(":");
-			string secondNumber = numNTaddedStr.substr(separatorPos+1);
-			numNTinvAdded = atoi( secondNumber.c_str() );
-		}
-	}
-
-	string ntAdded = fetchElement( lineStream, 1 ); // to 6
-	string ntInvAdded = "";
-        string testaaaaaaaaaaaa = "";
-
-	// basically, there are two type of inversions:
-	//	a) The 'alternatively called small deletions' INV 2 NT 2 "TG"
-	// b) the regular inversions INV98 NT 0:60 "":"GCT"
-	if ( svType.compare("INV") == 0 ) {
-		if (ntAdded.find(":")==string::npos ) {
-			simpleInversion = true;
-		}
-		else {
-			int separatorPos = ntAdded.find(":");
-			ntInvAdded = ntAdded.substr( separatorPos+2, numNTinvAdded ); // erases ""
-			svd.setSecondNT( ntInvAdded );
-			ntAdded = ntAdded.substr(0,separatorPos);
-		}
-	}
-	ntAdded.erase(0,1); // erases opening "
-	ntAdded.erase(numNTadded); // erases closing "
-	if (!simpleInversion) { svd.setNT( ntAdded ); }
-
-	string chromosomeID = fetchElement( lineStream, 2); // now at position 8
-	if (chromosomeID!=targetChromosomeID) {
-		return;
-	}
-	const string* reference = genome.getChromosome( chromosomeID );
-	//cout << "reference is " << *reference << endl;
-	if ( reference== NULL ) {
-		cout << "Error! Reference chromosome \"" << chromosomeID << "\" not found!" << endl;
-		exit(EXIT_FAILURE);
-	}
-	svd.setChromosome( chromosomeID );
-	int beforeStartPos = atoi( fetchElement( lineStream, 2 ).c_str() ); // pos 10
-	svd.setPosition( beforeStartPos ); // now at position 10
-	int leftmostEndPos = atoi( fetchElement( lineStream, 1 ).c_str()); // now at position 11
-	int leftmostStartPos = atoi (fetchElement( lineStream, 2 ).c_str());  // at position 13
-	int rightmostEndPos = atoi (fetchElement( lineStream, 1 ).c_str()); // now at position 14
-	svd.setBPrange( leftmostStartPos, rightmostEndPos );
-	svd.setEnd( leftmostEndPos );
-	svd.setHomlen( rightmostEndPos - leftmostEndPos );
-	string homSeq="";
-	for (int position=leftmostEndPos; position<rightmostEndPos; position++ ) {
-		homSeq += (*reference)[ position ];
-	}
-	svd.setHomseq( homSeq );
-	if ( svType.compare("D")==0 ) {
-		if (numNTadded==0 ) {
-			svd.setSVtype( "DEL" );
-			svd.setReplace( 0 );
-		}
-		else {   // some NT-bases added
-			svd.setSVtype( "RPL" );
-			svd.setReplace( numNTadded );
-		}
-	}
-	else if ( svType.compare("I")==0 ) {
-		svd.setSVtype("INS");
-		svd.setReplace( 0 );
-	}
-	else if ( svType.compare("TD")==0 ) {
-		svd.setSVtype("DUP:TANDEM");
-		svd.setReplace( numNTadded );
-	}
-	else if ( svType.compare("INV") == 0 ) {
-		svd.setSVtype("INV");
-		if (simpleInversion) {
-			svd.setReplace( 0, 0 );
-		}
-		else {
-			svd.setReplace( numNTadded, numNTinvAdded );
-		}
-	}
-	string sampleName = fetchElement( lineStream, 18);
-	int refSupportAtStartOfEvent = 0;
-	int refSupportAtEndOfEvent = 0;
-
-	if ( pindel024uOrLater ) {
-		refSupportAtStartOfEvent = atoi( fetchElement( lineStream, 1 ).c_str() );
-		refSupportAtEndOfEvent = atoi( fetchElement( lineStream, 1 ).c_str() );
-		//std::cout << "outside refSupportAtStartOfEvent: " <<  sampleName << "\t" << refSupportAtStartOfEvent << "\t" << "refSupportAtEndOfEvent: " << refSupportAtEndOfEvent << std::endl;
-	}
-	int totalRefSupport = max(refSupportAtStartOfEvent, refSupportAtEndOfEvent);
-	//std::cout << "outside totalRefSupport: " << totalRefSupport << std::endl; 
-	int numberOfItemsUntilNextSupport = ( pindel024uOrLater ? 2 : 2 );
-	int plusSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport - 1 ).c_str()); // now at position 33, total +supports sample 1; for unique support 1->2
-	int minSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport ).c_str()); // now at position 35, total +supports sample 1
-	int count=0;
-	while (!lineStream.fail()) {
-		if (sampleMap.find( sampleName )==sampleMap.end() ) {
-			cout << "Error: could not find sample " << sampleName << endl;
-		}
-		else {
-			int sampleID = sampleMap[ sampleName ];
-			//std::cout << "Adding " << sampleID << "\t" << plusSupport << "\t" << minSupport << "\t" << totalRefSupport << std::endl; 
-			svd.addGenotype( sampleID, plusSupport , minSupport, totalRefSupport );
-		}
-		sampleName = fetchElement( lineStream, 2); // for unique support, 2->1,
-		if ( pindel024uOrLater ) {
-			refSupportAtStartOfEvent = atoi( fetchElement( lineStream, 1 ).c_str() );
-			refSupportAtEndOfEvent = atoi( fetchElement( lineStream, 1 ).c_str() );
-			//std::cout << "inside refSupportAtStartOfEvent: " << sampleName << "\t" << refSupportAtStartOfEvent << "\t" << "refSupportAtEndOfEvent: " << refSupportAtEndOfEvent << std::endl;
-		}
-		totalRefSupport = max(refSupportAtStartOfEvent, refSupportAtEndOfEvent);
-		//std::cout << "insert totalRefSupport: " << totalRefSupport << std::endl; 
-		plusSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport - 1 ).c_str()); // for unique support, 2->1
-		minSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport ).c_str()); // now at position 33, total +supports sample 1
-	}
-=======
 void convertIndelToSVdata( InputReader& pindelInput, map< string, int>& sampleMap, Genome& genome, SVData& svd, const string& targetChromosomeID ) {
     string line;
     svd.setGenome( genome );
@@ -1514,7 +1309,6 @@ void convertIndelToSVdata( InputReader& pindelInput, map< string, int>& sampleMa
         plusSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport - 1 ).c_str()); // for unique support, 2->1
         minSupport = atoi( fetchElement( lineStream, numberOfItemsUntilNextSupport ).c_str()); // now at position 33, total +supports sample 1
     }
->>>>>>> c5f3090321ebf1288f502bfefa722e111f764219
 }
 
 /* 'readReference' reads in the reference. */
@@ -1635,6 +1429,8 @@ void printHelp() {
 
     for ( int parameterIndex=0; parameterIndex<parameters.size(); parameterIndex++ ) {
         parameters[ parameterIndex ]->describe();
+        // split required paras in help
+        if ( parameterIndex == 2 ) cout << endl;
     }
     exit( EXIT_SUCCESS );
 }
@@ -1707,14 +1503,7 @@ void makeSampleMap( const set<string>& sampleNames, map<string, int>& sampleMap 
     }
 }
 
-void initBaseArray() {
-    for ( int i=0; i<256; i++ ) { g_normalBaseArray[i] = false; }
-    g_normalBaseArray['A'] = true;
-    g_normalBaseArray['C'] = true;
-    g_normalBaseArray['G'] = true;
-    g_normalBaseArray['T'] = true;
-    g_normalBaseArray['N'] = true;
-}
+void initBaseArray() { g_normalBaseArray['A'] = g_normalBaseArray['C'] = g_normalBaseArray['G'] = g_normalBaseArray['T'] = g_normalBaseArray['N'] = true; }
 
 void reportSVsInChromosome( const string& chromosomeID, const set<string>& chromosomeNames, const set<string>& sampleNames, InputReader& pindelInput, map< string, int >& sampleMap, Genome& genome, ofstream& vcfFile ) {
     // if no reads have been found for this chromosome, skip it
@@ -1763,7 +1552,7 @@ void reportSVsInChromosome( const string& chromosomeID, const set<string>& chrom
 int main( int argc, char* argv[] ) {
     initBaseArray();
     createParameters();
-    readParameters(argc,argv);
+    readParameters( argc, argv );
     if ( argc == 1 ) {
         printHelp();
         exit(EXIT_SUCCESS);
